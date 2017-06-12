@@ -1,0 +1,121 @@
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+
+HIGH 12
+HIGH 13
+
+'Definition des constantes
+left_wheel CON 12
+right_wheel CON 13
+
+
+vitesse_left CON 1000
+vitesse_right CON 100
+
+vitesse_recule_left  CON  100
+vitesse_recule_right  CON 400
+
+
+ 'PLUS DE MODIF
+ 'P7 -> GP16
+ 'P6 -> GP15
+ 'P5 -> GP14
+'Definition des VARIABLES :
+
+
+
+command VAR Word
+
+cpt VAR Word
+
+'La fonction principale
+
+main :
+
+bit_1  VAR  IN4
+INPUT 4
+bit_2  VAR  IN5
+INPUT 5
+bit_3  VAR  IN6
+INPUT 6
+bit_4  VAR  IN7
+INPUT 7
+  command = 0
+
+
+  IF bit_4 = 1 THEN add_bit_4
+add_bit_4_return :
+
+  IF bit_3 = 1 THEN add_bit_3
+add_bit_3_return :
+
+  IF bit_2 = 1 THEN add_bit_2
+add_bit_2_return :
+
+  bit_1 = 0
+
+  IF bit_2<>0 | bit_3<>0 | bit_4<>0 THEN
+    DEBUG DEC command, CR
+  ENDIF
+
+  IF command = 1   THEN forward
+  IF command = 2   THEN backward
+  IF command = 3   THEN left
+  IF command = 4   THEN right
+  IF command = 5   THEN stoppe
+
+  GOTO main
+
+
+'Les fonctions pour definir les
+'mouvements
+
+forward :
+FOR cpt = 0 TO 30
+    PULSOUT left_wheel, vitesse_left
+    PULSOUT right_wheel, vitesse_right
+NEXT
+GOTO main
+
+
+backward :
+  FOR cpt = 0 TO 30
+    PULSOUT left_wheel, vitesse_recule_left
+    PULSOUT right_wheel, vitesse_recule_right
+  NEXT
+  GOTO main
+
+right :
+  FOR cpt = 0 TO 30
+    PULSOUT left_wheel, 0
+    PULSOUT right_wheel, vitesse_right
+  NEXT
+  GOTO main
+
+left :
+  FOR cpt = 0 TO 30
+    PULSOUT left_wheel, vitesse_left
+    PULSOUT right_wheel, 0
+  NEXT
+  GOTO main
+
+stoppe :
+  PULSOUT left_wheel, 0
+  PULSOUT right_wheel, 0
+  GOTO main
+
+'Fonctions permettant de mettre à jour
+'la commande.
+
+add_bit_4 :
+  command = command + 1
+  GOTO add_bit_4_return
+
+add_bit_3 :
+  command = command + 2
+  GOTO add_bit_3_return
+
+add_bit_2 :
+  command = command + 4
+  GOTO add_bit_2_return

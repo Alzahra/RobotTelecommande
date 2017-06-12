@@ -1,0 +1,523 @@
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;**********************************************************************
+                      00002 ;   Ce fichier est la base de départ pour une programmation avec      *
+                      00003 ;   le PIC 16F84. Il contient  les informations de  base pour         *
+                      00004 ;   démarrer.                                                         *  
+                      00005 ;                                                                     *
+                      00006 ;   Si les interruptions ne sont pas utilisées, supprimez les lignes  *
+                      00007 ;   entre ORG 0x004 et l'étiquette init. De plus, les variables       *
+                      00008 ;   w_temp et status_temp peuvent être supprimées.                    *
+                      00009 ;                                                                     *
+                      00010 ;**********************************************************************
+                      00011 ;                                                                     *
+                      00012 ;    NOM:                                                             *
+                      00013 ;    Date:                                                            *
+                      00014 ;    Version:                                                         *
+                      00015 ;    Circuit:                                                         *
+                      00016 ;    Auteur:                                                          *
+                      00017 ;                                                                     *
+                      00018 ;**********************************************************************
+                      00019 ;                                                                     *
+                      00020 ;    Fichier requis: P16F84.inc                                       *
+                      00021 ;                                                                     *
+                      00022 ;                                                                     *
+                      00023 ;                                                                     *
+                      00024 ;**********************************************************************
+                      00025 ;                                                                     *
+                      00026 ;    Notes:                                                           *
+                      00027 ;                                                                     *
+                      00028 ;                                                                     *
+                      00029 ;                                                                     *
+                      00030 ;                                                                     *
+                      00031 ;**********************************************************************
+                      00032 
+                      00033 
+                      00034     LIST      p=16F84             ; Définition de processeur
+                      00035     #include <p16F84.inc>         ; Définitions des constantes
+                      00001         LIST
+                      00002 ; P16F84.INC  Standard Header File, Version 2.00    Microchip Technology, Inc.
+                      00136         LIST
+                      00036     radix dec                     ; on travaille en décimal par défaut
+                      00037 
+2007   3FF9           00038     __CONFIG   _CP_OFF & _WDT_OFF & _PWRTE_OFF & _XT_OSC
+                      00039 
+                      00040 ; '__CONFIG' précise les paramètres encodés dans le processeur au moment de
+                      00041 ; la programmation. Les définitions sont dans le fichier include.
+                      00042 ; Voici les valeurs et leurs définitions :
+                      00043 ;    _CP_ON                Code protection ON : impossible de relire
+                      00044 ;    _CP_OFF                Code protection OFF
+                      00045 ;    _PWRTE_ON            Timer reset sur power on en service
+                      00046 ;    _PWRTE_OFF            Timer reset hors-service
+                      00047 ;    _WDT_ON                Watch-dog en service
+                      00048 ;    _WDT_OFF              Watch-dog hors service
+                      00049 ;    _LP_OSC                Oscillateur quartz basse vitesse
+                      00050 ;    _XT_OSC                Oscillateur quartz moyenne vitesse
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00051 ;    _HS_OSC                Oscillateur quartz grande vitesse
+                      00052 ;    _RC_OSC                Oscillateur à réseau RC
+                      00053 
+                      00054 ;*********************************************************************
+                      00055 ;                              ASSIGNATIONS                          *
+                      00056 ;*********************************************************************
+                      00057 
+  00000040            00058 OPTIONVAL    EQU    H'40'            ; Valeur registre option
+                      00059                                 ; Résistance pull-up ON
+                      00060                                 ; Interrupt flanc montant RB0
+                      00061                                 ; Préscaler timer à 2 (exemple)
+                      00062 
+  00000090            00063 INTERMASK    EQU    H'90'       ; Masque d'interruption
+                      00064                                 ; Interruptions sur RB0
+                      00065 
+                      00066 
+                      00067 ;*********************************************************************
+                      00068 ;                   DECLARATIONS DE VARIABLES                        *
+                      00069 ;*********************************************************************
+                      00070 
+                      00071     CBLOCK 0x00C                   ; début de la zone variables
+  0000000C            00072     w_temp :1                    ; Zone de 1 byte
+  0000000D            00073     status_temp : 1                ; zone de 1 byte
+  0000000E            00074     cmpt1                      ; compteur de boucles 1
+                      00075     ;cmpt2 : 1                     ; compteur de boucles 2
+                      00076     ;cmpt3 : 1                     ; compteur de boucles 3
+                      00077     ;cmpt4 : 1                     ; compteur pour nb message
+  0000000F            00078         nbfront 
+  00000010            00079         bouclea
+                      00080         ;temp                                   ;compteur pour le tempo
+                      00081     ENDC                        ; Fin de la zone                        
+                      00082 
+                      00083 ;**********************************************************************
+                      00084 ;                      DEMARRAGE SUR RESET                            *
+                      00085 ;**********************************************************************
+                      00086 
+0000                  00087     org 0x000                     ; Adresse de départ après reset
+0000   280E           00088       goto    init                ; Adresse 0: initialiser
+                      00089 
+                      00090 ;**********************************************************************
+                      00091 ;                     ROUTINE INTERRUPTION                            *
+                      00092 ;**********************************************************************
+                      00093         
+                      00094    ;sauvegarder registres       
+                      00095    ;---------------------  
+0004                  00096    ORG 0x004    ; adresse d'interruption  
+0004   008C           00097    movwf        w_temp    ; sauver registre W  
+0005   0E03           00098    swapf        STATUS,w  ; swap status avec résultat dans w  
+0006   008D           00099    movwf        status_temp  ; sauver status swappé 
+                      00100    
+0007   0A8F           00101    incf         nbfront,1
+                      00102    ;bsf         PORTB,2
+0008   108B           00103    bcf          INTCON,INTF  ; effacer flag interupt RB0   
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00104    
+                      00105       ;restaurer registres            
+0009   0E0D           00106    swapf        status_temp,w ; swap ancien status, résultat dans w  
+000A   0083           00107    movwf        STATUS   ; restaurer status  
+000B   0E8C           00108    swapf        w_temp,f  ; Inversion L et H de l'ancien W                          
+                      00109                                 ; sans modifier Z  
+000C   0E0C           00110    swapf        w_temp,w  ; Ré-inversion de L et H dans W        
+                      00111                                  ; W restauré sans modifier status  
+000D   0009           00112    retfie      ; return from interrupt 
+                      00113 ;*********************************************************************
+                      00114 ;                       INITIALISATIONS                              *
+                      00115 ;*********************************************************************
+                      00116 
+000E                  00117 init
+000E   1283           00118     bcf     STATUS,RP0            ; sélectionner banque 0
+000F   0185           00119     clrf    PORTA                ; Sorties portA à 0
+0010   0186           00120     clrf    PORTB                ; sorties portB à 0
+                      00121     
+0011   1683           00122     bsf     STATUS,RP0            ; sélectionner banque 1
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0012   1005           00123     bcf     TRISA,0                ;sortie
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0013   1085           00124     bcf     TRISA,1                ;sortie
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0014   1105           00125     bcf     TRISA,2                ;sortie
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0015   1406           00126     bsf     TRISB,0                ;entrée
+                      00127     ;bcf        TRISB,2                                 ;sortie
+                      00128     
+0016   1283           00129     bcf     STATUS,RP0            ; sélectionner banque 0
+0017   018B           00130         clrf    INTCON                          ; tout a zerro (interuptions)
+0018   160B           00131         bsf             INTCON,INTE             ; interruption sur RB0 (4)
+0019   018F           00132         clrf    nbfront                          ; Le message est vide de base
+001A   2821           00133     goto start
+                      00134 
+                      00135 ;*********************************************************************
+                      00136 ;                                               SOUS-ROUTINE DE TEMPORISATION *
+                      00137 ;*********************************************************************
+                      00138 ;---------------------------------------------------------------------
+                      00139 ; Cette sous-routine introduit un retard de 500.000 µs.
+                      00140 ; Elle ne reçoit aucun paramètre et n'en retourne aucun
+                      00141 ;---------------------------------------------------------------------
+001B                  00142 tempo
+001B   30FA           00143     movlw       250             ; pour 249*2 + 250
+001C   008E           00144     movwf       cmpt1        ; initialiser compteur3
+001D                  00145 boucle1
+001D   0000           00146     nop                 
+001E   0B8E           00147     decfsz      cmpt1 , f     ; décrémenter compteur1
+001F   281D           00148     goto        boucle1         ; si pas 0, boucler
+0020   0008           00149     return                 ; retour de la sous-routine
+                      00150 
+                      00151 ;*********************************************************************
+                      00152 ;                      PROGRAMME PRINCIPAL                           *
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00153 ;*********************************************************************
+                      00154  
+0021                  00155 start
+0021   0185           00156         clrf    PORTA 
+0022   178B           00157         bsf     INTCON,GIE ;activation interruption
+                      00158         ;call tempo
+0023   3000           00159         movlw   0
+0024   008F           00160         movwf   nbfront
+                      00161         ;movlw  5                               ;pour écouter nos 12 fronts max au moins
+                      00162         ;movwf  temp
+                      00163 
+                      00164 
+0025                  00165 attente
+0025   180F           00166         btfsc   nbfront,0
+0026   2828           00167         goto    attente2
+0027   2825           00168         goto    attente 
+                      00169   
+0028                  00170 attente2
+0028   201B           00171         call tempo
+0029   201B           00172         call tempo 
+002A   201B           00173         call tempo 
+002B   201B           00174         call tempo  ;2ms
+002C   201B           00175         call tempo
+002D   201B           00176         call tempo 
+002E   201B           00177         call tempo 
+002F   201B           00178         call tempo  ;2ms
+0030   201B           00179         call tempo
+0031   201B           00180         call tempo 
+0032   201B           00181         call tempo 
+0033   201B           00182         call tempo  ;2ms
+0034   201B           00183         call tempo
+0035   201B           00184         call tempo 
+0036   201B           00185         call tempo 
+0037   201B           00186         call tempo  ;2ms
+0038   201B           00187         call tempo
+0039   201B           00188         call tempo 
+003A   201B           00189         call tempo 
+003B   201B           00190         call tempo  ;2ms
+003C   201B           00191         call tempo
+003D   201B           00192         call tempo 
+003E   201B           00193         call tempo 
+003F   201B           00194         call tempo  ;2ms
+0040   201B           00195         call tempo
+0041   201B           00196         call tempo 
+0042   201B           00197         call tempo 
+0043   201B           00198         call tempo  ;2ms
+0044   201B           00199         call tempo
+0045   201B           00200         call tempo 
+0046   201B           00201         call tempo 
+0047   201B           00202         call tempo  ;2ms
+0048   201B           00203         call tempo
+0049   201B           00204         call tempo 
+004A   201B           00205         call tempo 
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+004B   201B           00206         call tempo  ;2ms
+004C   201B           00207         call tempo
+004D   201B           00208         call tempo 
+004E   201B           00209         call tempo 
+004F   201B           00210         call tempo  ;2ms
+0050   201B           00211         call tempo
+0051   201B           00212         call tempo 
+0052   201B           00213         call tempo 
+0053   201B           00214         call tempo  ;2ms
+0054   201B           00215         call tempo
+0055   201B           00216         call tempo 
+0056   201B           00217         call tempo 
+0057   201B           00218         call tempo  ;2ms 
+0058   201B           00219         call tempo
+0059   201B           00220         call tempo
+005A   201B           00221         call tempo
+                      00222         ;call tempo
+                      00223         ;decfsz         temp,f
+                      00224         ;goto   attente2
+005B   285C           00225         goto    traitement
+                      00226                 
+005C                  00227 traitement   
+005C   138B           00228         bcf     INTCON,GIE
+005D   3003           00229         movlw   3
+005E   028F           00230         subwf   nbfront,1 ;nbfront - W
+005F   0B8F           00231         decfsz  nbfront, f; nbfront - 4 
+0060   2870           00232         goto    reculer
+0061   2862           00233         goto    avancer1
+                      00234 
+0062                  00235 avancer1
+0062   3005           00236         movlw   5                               ;pour écouter nos 12 fronts max au moins
+0063   0090           00237         movwf   bouclea
+                      00238 
+0064                  00239 avancer2
+0064   1405           00240         bsf PORTA, 0
+0065   0000           00241         nop
+0066   0000           00242         nop
+0067   1085           00243         bcf PORTA, 1
+0068   0000           00244         nop
+0069   0000           00245         nop
+006A   1105           00246         bcf PORTA, 2
+006B   0000           00247         nop
+006C   0000           00248         nop
+006D   0B90           00249         decfsz  bouclea,f
+006E   2864           00250         goto    avancer2
+                      00251         ;call tempo
+                      00252         ;call tempo
+006F   2821           00253         goto start
+                      00254         
+0070                  00255 reculer
+0070   3001           00256         movlw   1
+0071   028F           00257         subwf   nbfront,1
+0072   0B8F           00258         decfsz  nbfront,f ;nbfront - 6
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0073   2883           00259         goto    gauche
+0074   2875           00260         goto    reculer1
+                      00261         
+0075                  00262 reculer1
+0075   3005           00263         movlw   5                               ;pour écouter nos 12 fronts max au moins
+0076   0090           00264         movwf   bouclea
+0077                  00265 reculer2
+0077   1005           00266         bcf PORTA, 0
+0078   0000           00267         nop
+0079   0000           00268         nop
+007A   1485           00269         bsf PORTA, 1
+007B   0000           00270         nop
+007C   0000           00271         nop
+007D   1105           00272         bcf PORTA, 2
+007E   0000           00273         nop
+007F   0000           00274         nop
+0080   0B90           00275         decfsz  bouclea,f
+0081   2877           00276         goto    reculer2
+                      00277         ;call tempo
+                      00278         ;call tempo
+0082   2821           00279         goto start
+                      00280 
+0083                  00281 gauche
+0083   3001           00282         movlw   1
+0084   028F           00283         subwf   nbfront,1
+0085   0B8F           00284         decfsz  nbfront,f ;nbfront - 8
+0086   2896           00285         goto    droite
+0087   2888           00286         goto    gauche1 
+                      00287 
+0088                  00288 gauche1
+0088   3005           00289         movlw   5                               ;pour écouter nos 12 fronts max au moins
+0089   0090           00290         movwf   bouclea
+                      00291 
+008A                  00292 gauche2
+008A   1405           00293         bsf PORTA, 0
+008B   0000           00294         nop
+008C   0000           00295         nop     
+008D   1485           00296         bsf PORTA, 1
+008E   0000           00297         nop
+008F   0000           00298         nop     
+0090   1105           00299         bcf PORTA, 2
+0091   0000           00300         nop
+0092   0000           00301         nop     
+0093   0B90           00302         decfsz  bouclea,f
+0094   288A           00303         goto    gauche2
+                      00304         ;call tempo     
+                      00305         ;call tempo
+0095   2821           00306         goto start
+                      00307 
+0096                  00308 droite
+0096   3001           00309         movlw   1
+0097   028F           00310         subwf   nbfront,1
+0098   0B8F           00311         decfsz  nbfront,f ;nbfront -10
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0099   28A9           00312         goto    stop
+009A   289B           00313         goto    droite1
+                      00314         
+009B                  00315 droite1
+009B   3005           00316         movlw   5                               ;pour écouter nos 12 fronts max au moins
+009C   0090           00317         movwf   bouclea
+009D                  00318 droite2
+009D   1005           00319         bcf PORTA, 0
+009E   0000           00320         nop
+009F   0000           00321         nop
+00A0   1085           00322         bcf PORTA, 1
+00A1   0000           00323         nop
+00A2   0000           00324         nop
+00A3   1505           00325         bsf PORTA, 2
+00A4   0000           00326         nop
+00A5   0000           00327         nop
+00A6   0B90           00328         decfsz  bouclea,f
+00A7   289D           00329         goto    droite2
+                      00330         ;call tempo
+                      00331         ;call tempo
+00A8   2821           00332         goto start
+                      00333 
+00A9                  00334 stop                            
+00A9   3005           00335         movlw   5
+00AA   028F           00336         subwf   nbfront,1
+                      00337         ;movlw  1
+                      00338         ;subwf  nbfront,1
+                      00339         ;decfsz         nbfront,f ;nbfront - 15
+00AB   180F           00340         btfsc   nbfront,0
+00AC   2821           00341         goto    start
+00AD   28AE           00342         goto    stop2
+                      00343 
+00AE                  00344 stop2   
+00AE   1405           00345         bsf PORTA, 0
+00AF   0000           00346         nop
+00B0   0000           00347         nop
+00B1   1085           00348         bcf PORTA, 1
+00B2   0000           00349         nop
+00B3   0000           00350         nop
+00B4   1505           00351         bsf PORTA, 2
+00B5   0000           00352         nop
+00B6   0000           00353         nop
+00B7   201B           00354         call tempo
+00B8   201B           00355         call tempo
+00B9   2821           00356         goto start
+                      00357         END                ; directive fin de programme
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  8
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+C                                 00000000
+DC                                00000001
+EEADR                             00000009
+EECON1                            00000088
+EECON2                            00000089
+EEDATA                            00000008
+EEIE                              00000006
+EEIF                              00000004
+F                                 00000001
+FSR                               00000004
+GIE                               00000007
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTERMASK                         00000090
+INTF                              00000001
+IRP                               00000007
+NOT_PD                            00000003
+NOT_RBPU                          00000007
+NOT_TO                            00000004
+OPTIONVAL                         00000040
+OPTION_REG                        00000081
+PCL                               00000002
+PCLATH                            0000000A
+PORTA                             00000005
+PORTB                             00000006
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+RBIE                              00000003
+RBIF                              00000000
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+STATUS                            00000003
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+TMR0                              00000001
+TRISA                             00000085
+TRISB                             00000086
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+_CP_OFF                           00003FFF
+_CP_ON                            0000000F
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+MPASM 03.90 Released                            RECEPTION.ASM   5-31-2017  13:51:48         PAGE  9
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_XT_OSC                           00003FFD
+__16F84                           00000001
+attente                           00000025
+attente2                          00000028
+avancer1                          00000062
+avancer2                          00000064
+boucle1                           0000001D
+bouclea                           00000010
+cmpt1                             0000000E
+droite                            00000096
+droite1                           0000009B
+droite2                           0000009D
+gauche                            00000083
+gauche1                           00000088
+gauche2                           0000008A
+init                              0000000E
+nbfront                           0000000F
+reculer                           00000070
+reculer1                          00000075
+reculer2                          00000077
+start                             00000021
+status_temp                       0000000D
+stop                              000000A9
+stop2                             000000AE
+tempo                             0000001B
+traitement                        0000005C
+w_temp                            0000000C
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : X---XXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXX------
+2000 : -------X-------- ---------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   183
+Program Memory Words Free:   841
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     4 reported,     0 suppressed
+
+
